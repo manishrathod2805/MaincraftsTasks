@@ -1095,6 +1095,68 @@ form button:hover {
   font-size: 16px;
 }
 
+/* ===== Submissions Page ===== */
+.submissions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.submission-card {
+  background: var(--white);
+  padding: 20px 24px;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.submission-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 12px;
+}
+
+.submission-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text-color);
+}
+
+.submission-email {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+.submission-index {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(46, 191, 145, 0.08);
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.submission-message {
+  margin: 10px 0;
+  color: var(--text-color);
+  white-space: pre-wrap;
+}
+
+.submission-meta {
+  margin-top: 5px;
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.no-submissions {
+  text-align: center;
+  color: var(--text-light);
+  font-style: italic;
+}
+
 /* ===== Responsive Design ===== */
 @media (max-width: 1024px) {
   .hero-stats {

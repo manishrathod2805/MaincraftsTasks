@@ -302,13 +302,14 @@ function subscribeNewsletter(event) {
   }, 5000);
 }
 
-// ===== Enhanced Form Validation =====
+// ===== Enhanced Form Validation + LocalStorage Save =====
 function validateForm() {
   let isValid = true;
   
   const name = document.getElementById('name');
   const email = document.getElementById('email');
   const message = document.getElementById('message');
+  const subject = document.getElementById('subject');
   
   const nameError = document.getElementById('nameError');
   const emailError = document.getElementById('emailError');
@@ -323,7 +324,7 @@ function validateForm() {
   if (email) email.style.border = '2px solid #e0e0e0';
   if (message) message.style.border = '2px solid #e0e0e0';
   
-  // Validate name
+  // Validate name (no empty)
   if (name && name.value.trim() === '') {
     if (nameError) {
       nameError.textContent = 'Name is required';
@@ -331,16 +332,9 @@ function validateForm() {
     }
     name.style.border = '2px solid #e74c3c';
     isValid = false;
-  } else if (name && name.value.trim().length < 2) {
-    if (nameError) {
-      nameError.textContent = 'Name must be at least 2 characters';
-      nameError.style.display = 'block';
-    }
-    name.style.border = '2px solid #e74c3c';
-    isValid = false;
   }
   
-  // Validate email
+  // Validate email (no empty + simple pattern)
   if (email && email.value.trim() === '') {
     if (emailError) {
       emailError.textContent = 'Email is required';
@@ -360,7 +354,7 @@ function validateForm() {
     }
   }
   
-  // Validate message
+  // Validate message (no empty)
   if (message && message.value.trim() === '') {
     if (messageError) {
       messageError.textContent = 'Message is required';
@@ -368,39 +362,49 @@ function validateForm() {
     }
     message.style.border = '2px solid #e74c3c';
     isValid = false;
-  } else if (message && message.value.trim().length < 10) {
-    if (messageError) {
-      messageError.textContent = 'Message must be at least 10 characters';
-      messageError.style.display = 'block';
-    }
-    message.style.border = '2px solid #e74c3c';
-    isValid = false;
   }
   
   if (isValid) {
-    // Show success message
     const form = document.getElementById('contactForm');
     if (form) {
-      const successMessage = document.createElement('div');
-      successMessage.className = 'success-message';
-      successMessage.style.cssText = 'background: #2ebf91; color: white; padding: 15px; border-radius: 8px; margin-top: 20px; text-align: center;';
-      successMessage.textContent = 'Thank you! Your message has been sent successfully.';
-      form.appendChild(successMessage);
-      
-      // Reset form
+      // Build submission object
+      const submission = {
+        name: name ? name.value.trim() : '',
+        email: email ? email.value.trim() : '',
+        subject: subject ? subject.value.trim() : '',
+        message: message ? message.value.trim() : '',
+        createdAt: new Date().toISOString()
+      };
+
+      // Read existing submissions from LocalStorage
+      const key = 'contactSubmissions';
+      let existing = [];
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          existing = JSON.parse(raw);
+          if (!Array.isArray(existing)) existing = [];
+        }
+      } catch (e) {
+        existing = [];
+      }
+
+      // Add new submission and save back
+      existing.push(submission);
+      localStorage.setItem(key, JSON.stringify(existing));
+
+      // Optional: clear form
       form.reset();
-      
-      // Remove success message after 5 seconds
-      setTimeout(() => {
-        successMessage.remove();
-      }, 5000);
+
+      // Redirect to submissions page to display saved data
+      window.location.href = 'submissions.html';
     }
   }
   
-  return isValid;
+  return false; // Prevent default submit; we handle everything here
 }
 
-// ===== Real-time Form Validation =====
+// ===== Real-time Form Validation + Submissions Page Loader =====
 document.addEventListener('DOMContentLoaded', () => {
   const nameInput = document.getElementById('name');
   const emailInput = document.getElementById('email');
@@ -429,6 +433,52 @@ document.addEventListener('DOMContentLoaded', () => {
         messageInput.style.border = '2px solid #2ebf91';
       }
     });
+  }
+
+  // Load submissions on Submissions page
+  const submissionsContainer = document.getElementById('submissionsList');
+  if (submissionsContainer) {
+    let submissions = [];
+    try {
+      const stored = localStorage.getItem('contactSubmissions');
+      submissions = stored ? JSON.parse(stored) : [];
+      if (!Array.isArray(submissions)) submissions = [];
+    } catch (e) {
+      submissions = [];
+    }
+
+    if (!submissions.length) {
+      submissionsContainer.innerHTML = '<p class="no-submissions">No submissions found yet. Fill out the contact form to see your messages here.</p>';
+    } else {
+      submissionsContainer.innerHTML = '';
+
+      submissions
+        .slice()
+        .reverse()
+        .forEach((submission, index) => {
+          const card = document.createElement('div');
+          card.className = 'submission-card';
+
+          const timestamp = submission.createdAt ? new Date(submission.createdAt) : null;
+          const formattedDate = timestamp && !isNaN(timestamp)
+            ? timestamp.toLocaleString()
+            : 'Unknown time';
+
+          card.innerHTML = `
+            <div class="submission-header">
+              <div>
+                <h3>${submission.name || 'Anonymous'}</h3>
+                <p class="submission-email">${submission.email || 'No email provided'}</p>
+              </div>
+              <span class="submission-index">#${submissions.length - index}</span>
+            </div>
+            <p class="submission-message">${(submission.message || '').replace(/\n/g, '<br>')}</p>
+            <p class="submission-meta">Submitted on ${formattedDate}</p>
+          `;
+
+          submissionsContainer.appendChild(card);
+        });
+    }
   }
 });
 
@@ -497,4 +547,52 @@ document.addEventListener('DOMContentLoaded', () => {
     item.style.opacity = '1';
     item.style.transform = 'scale(1)';
   });
+
+  // ===== Render submissions page (if present) =====
+  const submissionsContainer = document.getElementById('submissionsContainer');
+  if (submissionsContainer) {
+    const key = 'contactSubmissions';
+    let submissions = [];
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        submissions = JSON.parse(raw);
+        if (!Array.isArray(submissions)) submissions = [];
+      }
+    } catch (e) {
+      submissions = [];
+    }
+
+    if (!submissions.length) {
+      submissionsContainer.innerHTML = `
+        <div class="card">
+          <p style="margin: 0; color: var(--text-light);">
+            No submissions yet. Go to the <a href="contact.html">contact page</a> and send a message.
+          </p>
+        </div>
+      `;
+    } else {
+      const listHtml = submissions
+        .slice()
+        .reverse()
+        .map((item, index) => {
+          const date = new Date(item.createdAt);
+          const formatted = isNaN(date.getTime())
+            ? ''
+            : date.toLocaleString();
+          return `
+            <div class="card" style="margin-bottom: 20px; text-align: left;">
+              <h3 style="margin-bottom: 10px;">${item.name || 'Unknown'} <span style="font-size: 12px; font-weight: 400; color: var(--text-light);">#${submissions.length - index}</span></h3>
+              <p style="margin: 4px 0;"><strong>Email:</strong> ${item.email || '-'}</p>
+              ${item.subject ? `<p style="margin: 4px 0;"><strong>Subject:</strong> ${item.subject}</p>` : ''}
+              <p style="margin: 10px 0; white-space: pre-wrap;"><strong>Message:</strong><br>${item.message || '-'}</p>
+              ${formatted ? `<p style="margin: 4px 0; font-size: 13px; color: var(--text-light);"><i class="fa fa-clock"></i> ${formatted}</p>` : ''}
+            </div>
+          `;
+        })
+        .join('');
+
+      submissionsContainer.innerHTML = listHtml;
+    }
+  }
 });
