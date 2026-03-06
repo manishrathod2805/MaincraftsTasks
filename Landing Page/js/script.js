@@ -272,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ===== Newsletter Subscription =====
-function subscribeNewsletter(event) {
+async function subscribeNewsletter(event) {
   event.preventDefault();
   
   const emailInput = document.getElementById('newsletterEmail');
@@ -290,20 +290,41 @@ function subscribeNewsletter(event) {
     messageDiv.style.color = '#e74c3c';
     return;
   }
-  
-  // Simulate subscription
-  messageDiv.textContent = 'Thank you for subscribing! Check your email for confirmation.';
-  messageDiv.style.color = '#2ebf91';
-  emailInput.value = '';
-  
+
+  try {
+    const response = await fetch('http://localhost:5000/api/newsletter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, source: 'landing-page-newsletter' })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorData.error || 'Something went wrong. Please try again.';
+      messageDiv.textContent = errorMessage;
+      messageDiv.style.color = '#e74c3c';
+      return;
+    }
+
+    messageDiv.textContent =
+      'Thank you for subscribing! Check your email for confirmation.';
+    messageDiv.style.color = '#2ebf91';
+    emailInput.value = '';
+  } catch (err) {
+    messageDiv.textContent =
+      'Unable to reach the server. Please try again later.';
+    messageDiv.style.color = '#e74c3c';
+  }
+
   // Reset message after 5 seconds
   setTimeout(() => {
     messageDiv.textContent = '';
   }, 5000);
 }
 
-// ===== Enhanced Form Validation + LocalStorage Save =====
-function validateForm() {
+// ===== Enhanced Form Validation + Backend Save =====
+async function validateForm() {
   let isValid = true;
   
   const name = document.getElementById('name');
@@ -367,40 +388,41 @@ function validateForm() {
   if (isValid) {
     const form = document.getElementById('contactForm');
     if (form) {
-      // Build submission object
-      const submission = {
+      const payload = {
         name: name ? name.value.trim() : '',
         email: email ? email.value.trim() : '',
         subject: subject ? subject.value.trim() : '',
-        message: message ? message.value.trim() : '',
-        createdAt: new Date().toISOString()
+        message: message ? message.value.trim() : ''
       };
 
-      // Read existing submissions from LocalStorage
-      const key = 'contactSubmissions';
-      let existing = [];
       try {
-        const raw = localStorage.getItem(key);
-        if (raw) {
-          existing = JSON.parse(raw);
-          if (!Array.isArray(existing)) existing = [];
+        const response = await fetch(
+          'http://localhost:5000/api/contact-submissions',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }
+        );
+
+        if (!response.ok) {
+          // Basic error surface; you can enhance with a dedicated message area
+          alert('Failed to send message. Please try again.');
+          return false;
         }
-      } catch (e) {
-        existing = [];
+
+        // Clear form
+        form.reset();
+
+        // Redirect to submissions page to display saved data from backend
+        window.location.href = 'submissions.html';
+      } catch (err) {
+        alert('Unable to reach the server. Please try again later.');
+        return false;
       }
-
-      // Add new submission and save back
-      existing.push(submission);
-      localStorage.setItem(key, JSON.stringify(existing));
-
-      // Optional: clear form
-      form.reset();
-
-      // Redirect to submissions page to display saved data
-      window.location.href = 'submissions.html';
     }
   }
-  
+
   return false; // Prevent default submit; we handle everything here
 }
 
@@ -435,34 +457,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Load submissions on Submissions page
+  // Load submissions on Submissions page from backend
   const submissionsContainer = document.getElementById('submissionsList');
   if (submissionsContainer) {
-    let submissions = [];
-    try {
-      const stored = localStorage.getItem('contactSubmissions');
-      submissions = stored ? JSON.parse(stored) : [];
-      if (!Array.isArray(submissions)) submissions = [];
-    } catch (e) {
-      submissions = [];
-    }
+    fetch('http://localhost:5000/api/contact-submissions')
+      .then((res) => res.json())
+      .then((data) => {
+        const submissions = Array.isArray(data.data) ? data.data : [];
+        if (!submissions.length) {
+          submissionsContainer.innerHTML =
+            '<p class="no-submissions">No submissions found yet. Fill out the contact form to see your messages here.</p>';
+          return;
+        }
 
-    if (!submissions.length) {
-      submissionsContainer.innerHTML = '<p class="no-submissions">No submissions found yet. Fill out the contact form to see your messages here.</p>';
-    } else {
-      submissionsContainer.innerHTML = '';
+        submissionsContainer.innerHTML = '';
 
-      submissions
-        .slice()
-        .reverse()
-        .forEach((submission, index) => {
+        submissions.forEach((submission, index) => {
           const card = document.createElement('div');
           card.className = 'submission-card';
 
-          const timestamp = submission.createdAt ? new Date(submission.createdAt) : null;
-          const formattedDate = timestamp && !isNaN(timestamp)
-            ? timestamp.toLocaleString()
-            : 'Unknown time';
+          const timestamp = submission.createdAt
+            ? new Date(submission.createdAt)
+            : null;
+          const formattedDate =
+            timestamp && !isNaN(timestamp)
+              ? timestamp.toLocaleString()
+              : 'Unknown time';
 
           card.innerHTML = `
             <div class="submission-header">
@@ -478,7 +498,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
           submissionsContainer.appendChild(card);
         });
-    }
+      })
+      .catch(() => {
+        submissionsContainer.innerHTML =
+          '<p class="no-submissions">Unable to load submissions right now. Please try again later.</p>';
+      });
   }
 });
 
